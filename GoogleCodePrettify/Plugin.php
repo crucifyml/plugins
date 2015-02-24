@@ -1,12 +1,11 @@
 <?php
 /**
- * Google高亮代码
+ * Google高亮代码 New!
  * 
  * @package Google Code Prettify
- * @author qining
- * @version 1.0.0
- * @dependence 9.9.2-*
- * @link http://typecho.org
+ * @author 公子
+ * @version 2.0.0
+ * @link http://zh.eming.li#typecho
  */
 class GoogleCodePrettify_Plugin implements Typecho_Plugin_Interface
 {
@@ -19,9 +18,6 @@ class GoogleCodePrettify_Plugin implements Typecho_Plugin_Interface
      */
     public static function activate()
     {
-        Typecho_Plugin::factory('Widget_Abstract_Contents')->contentEx = array('GoogleCodePrettify_Plugin', 'parse');
-        Typecho_Plugin::factory('Widget_Abstract_Contents')->excerptEx = array('GoogleCodePrettify_Plugin', 'parse');
-        Typecho_Plugin::factory('Widget_Abstract_Comments')->contentEx = array('GoogleCodePrettify_Plugin', 'parse');
         Typecho_Plugin::factory('Widget_Archive')->header = array('GoogleCodePrettify_Plugin', 'header');
         Typecho_Plugin::factory('Widget_Archive')->footer = array('GoogleCodePrettify_Plugin', 'footer');
     }
@@ -43,7 +39,19 @@ class GoogleCodePrettify_Plugin implements Typecho_Plugin_Interface
      * @param Typecho_Widget_Helper_Form $form 配置面板
      * @return void
      */
-    public static function config(Typecho_Widget_Helper_Form $form){}
+	public static function config(Typecho_Widget_Helper_Form $form)
+    {
+	    $color = array('desert' => _t('Desert'),
+	    			   'doxy' => _t('Doxy'),
+	    			   'sons-of-obsidian' => _t('Sons of obsidian'),
+	    			   'sunburst' => _t('Sunburst'),
+	    			   'github' => _t('Github'));
+		$type = new Typecho_Widget_Helper_Form_Element_Select('type', $color,'true',_t('请选择代码配色样式'));
+    	$form->addInput($type);
+
+    	$textarea = new Typecho_Widget_Helper_Form_Element_Textarea('custom', NULL, NULL, _t('自定义CSS代码'));
+    	$form->addInput($textarea);
+    }
     
     /**
      * 个人用户的配置面板
@@ -62,8 +70,12 @@ class GoogleCodePrettify_Plugin implements Typecho_Plugin_Interface
      * @return unknown
      */
     public static function header() {
-        $cssUrl = Helper::options()->pluginUrl . '/GoogleCodePrettify/src/prettify.css';
+    	$config = Helper::options()->plugin('GoogleCodePrettify');
+    	$type = $config->type ? $config->type : 'desert';
+    	$custom = $config->custom;
+    	$cssUrl = Helper::options()->pluginUrl . '/GoogleCodePrettify/src/' . $type . '.css';
         echo '<link rel="stylesheet" type="text/css" href="' . $cssUrl . '" />';
+        if($custom != '') echo "<style type=\"text/css\">$custom</style>";
     }
     
     /**
@@ -74,64 +86,9 @@ class GoogleCodePrettify_Plugin implements Typecho_Plugin_Interface
      * @return unknown
      */
     public static function footer() {
-        $jsUrl = Helper::options()->pluginUrl . '/GoogleCodePrettify/src/prettify.js';
-        echo '<script type="text/javascript" src="'. $jsUrl .'"></script>';
-        echo '<script type="text/javascript">window.onload = function () {
-            prettyPrint();
-        }</script>';
+        $jsUrl = Helper::options()->pluginUrl . '/GoogleCodePrettify/prettify.js';
+        echo '<script type="text/javascript" src="'.$jsUrl.'"></script>';
+        echo '<script type="text/javascript">window.onload = function () {var pre = document.getElementsByTagName(\'pre\');for(i=0,l=pre.length;i<l;i++) pre[i].className += " prettyprint linenums";prettyPrint();}</script>';
     }
     
-    /**
-     * 解析
-     * 
-     * @access public
-     * @param array $matches 解析值
-     * @return string
-     */
-    public static function parseCallback($matches)
-    {
-        $language = trim($matches[2]);
-        
-        $map = array(
-            'js'                =>  'javascript',
-            'as'                =>  'actionscript',
-            'as3'               =>  'actionscript3'
-        );
-        
-        if (!empty($language) && isset($map[$language])) {
-            $language = $map[$language];
-        }
-        
-        $source = '<div class="prettyprint-box"><table class="prettyprint-table"><tr>';
-        $numberItem = '<td width="2%" class="number"><table>';
-        $sourceItem = '<td width="98%" class="code"><pre' . (empty($language) ? '' : ' id="' . $language . '"') . ' class="prettyprint"><table>';
-        
-        $sourceList = explode("\n", trim($matches[3]));
-        foreach ($sourceList as $key => $sourceLine) {
-            $numberItem .= '<tr><td>' . ($key + 1) . '</td></tr>';
-            $sourceItem .= '<tr><td class="source">' . htmlspecialchars($sourceLine) . '</td></tr>';
-        }
-        
-        $numberItem .= '</table></td>';
-        $sourceItem .= '</table></pre></td>';
-        
-        return $source . $numberItem . $sourceItem . '</tr></table></div>';
-    }
-    
-    /**
-     * 插件实现方法
-     * 
-     * @access public
-     * @return void
-     */
-    public static function parse($text, $widget, $lastResult)
-    {
-        $text = empty($lastResult) ? $text : $lastResult;
-        
-        if ($widget instanceof Widget_Archive || $widget instanceof Widget_Abstract_Comments) {
-            return preg_replace_callback("/<(code|pre)(\s*[^>]*)>(.*?)<\/\\1>/is", array('GoogleCodePrettify_Plugin', 'parseCallback'), $text);
-        } else {
-            return $text;
-        }
-    }
 }
